@@ -55,6 +55,10 @@ class Game:
         self.all_enemies : list[Enemy] = []
         self.all_projectiles: list[Projectile] = []
 
+        self._shake_timer = 0.0
+        self._shake_duration = 0.2
+        self._shake_magnitude = 6
+
         self.spawn_timer : float = 0.0
         self.spawn_interval : float = 1.5  # seconds between spawns
         self.score : int = 0
@@ -118,6 +122,7 @@ class Game:
         if self.state == "play":
             #Spawn enemies on a timer, up to the wave cap
             if self.play_state == "wave":
+                self._shake_timer = max(0.0, self._shake_timer - dt)
                 self.spawn_timer -= dt
                 if self.spawn_timer <= 0 and self.enemies_spawned < self.wave_enemy_cap:
                     self.spawn_timer = self.spawn_interval
@@ -202,12 +207,15 @@ class Game:
             dist_sq = (p_pos - e_pos).length_squared()
             touch_dist = p_r + e_r
             if dist_sq <= touch_dist * touch_dist:
+                # basic feedback for collision with enemy
+                self._shake_timer = self._shake_duration
                 self.player.health -= enemy.contact_damage
                 self.player.damage_cooldown = self.player.damage_cooldown_time
                 break  #Only one hit per cooldown window
 
         #Player dies when health reaches 0
         if self.player.health <= 0:
+            self._shake_timer = 0.0
             self.state = "gameover"
 
     def _check_projectile_collisions(self) -> None:
@@ -230,6 +238,7 @@ class Game:
                 touch_dist = p_r + e_r
                 if dist_sq <= touch_dist * touch_dist:
                     enemy.health -= 4
+                    enemy._hit_flash_timer = 0.1
                     projectiles_to_remove.append(proj)
                     if enemy.health <= 0:
                         enemies_to_remove.append(enemy)
@@ -275,7 +284,14 @@ class Game:
     def draw(self) -> None:
         self.screen.fill(self.palette.hud)
 
-        pygame.draw.rect(self.screen, self.palette.panel, self.playfield)
+        shake_offset = pygame.Vector2(0, 0)
+        if self._shake_timer > 0:
+            shake_offset = pygame.Vector2(
+                random.uniform(-self._shake_magnitude, self._shake_magnitude),
+                random.uniform(-self._shake_magnitude, self._shake_magnitude)
+            )
+        shaken_playfield = self.playfield.move(shake_offset)
+        pygame.draw.rect(self.screen, self.palette.panel, shaken_playfield)
 
         if self.state == "title":
             self._draw_centered("Press Space to Start", y=self.playfield.centery, color=self.palette.text)
@@ -287,17 +303,17 @@ class Game:
         if self.play_state == "wave":
             self._draw_text(f"Wave: {self.wave}",(10,10),color=self.palette.text)
             self._draw_text(f"Enemies Left: {(self.wave_enemy_cap-self.enemies_spawned)+len(self.all_enemies)}",(10,30),color=self.palette.text)
+            self._draw_text(f"Health: {self.player.health}",(10,50),color=self.palette.text)
         for thing in self.all_things:
             obj = thing.shape
+            pos = pygame.Vector2(obj.position) + shake_offset
             match obj.shape:
-                #rectangle
                 case 0:
-                    rect = pygame.Rect(0,0,obj.width,obj.height)
-                    rect.center = obj.position
-                    pygame.draw.rect(self.screen, obj.color, rect )
-                #circle
+                    rect = pygame.Rect(0, 0, obj.width, obj.height)
+                    rect.center = pos
+                    pygame.draw.rect(self.screen, obj.color, rect)
                 case 1:
-                    pygame.draw.circle(self.screen, obj.color, obj.position, obj.radius)
+                    pygame.draw.circle(self.screen, obj.color, pos, obj.radius)
     def _draw_text(self, text: str, pos: tuple[int, int], color: pygame.Color) -> None:
         s = self.font.render(text, True, color)
         self.screen.blit(s, pos)

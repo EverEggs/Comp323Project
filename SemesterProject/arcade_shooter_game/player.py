@@ -11,6 +11,7 @@ class Player(Living):
         self.input = input_mgr
         self.playfield = playfield
         self.shape = ShapeContainer(position=pos, color=pal_color, radius=16)
+        self._base_color = pal_color
         self.velocity = pygame.Vector2(0, 0)
         self.acceleration = 20000.0
         self.friction = 0.5
@@ -27,6 +28,8 @@ class Player(Living):
         self._shoot_timer = max(0.0, self._shoot_timer - dt)
         if self.damage_cooldown > 0:
             self.damage_cooldown -= dt
+        # basic feedback for damage cooldown period
+        self.shape.color = pygame.Color("#ffffff") if self.damage_cooldown > 0 else self._base_color
         move_vec = self.input.movement_vector()
         self.velocity += move_vec * self.acceleration * dt
         self.velocity *= self.friction

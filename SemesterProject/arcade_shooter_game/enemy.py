@@ -33,6 +33,8 @@ class Enemy(Living):
                  movement_min_dist: float = 0.0,
                  movement_max_dist: float = 0.0):
         self.shape = ShapeContainer(position=pos, color=color, radius=radius)
+        self._base_color = color
+        self._hit_flash_timer = 0.0
         self.target = target
         self.move_style = move_style
         self.speed = speed
@@ -46,6 +48,10 @@ class Enemy(Living):
 
     def update(self, dt: float) -> None:
         super().update(dt)
+        # basic feedback on collision with projectile
+        if self._hit_flash_timer > 0:
+            self._hit_flash_timer -= dt
+            self.shape.color = pygame.Color("#ffffff") if self._hit_flash_timer > 0 else self._base_color
         match self.move_style:
             #Chaser — move directly toward the target
             case Movement_styles.MOVEMENT_CHASER:
